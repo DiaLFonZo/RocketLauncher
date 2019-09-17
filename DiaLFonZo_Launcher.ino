@@ -12,26 +12,29 @@ Arduining.com  05 Jan 2012 (hardware implemented version)
 #include "SevenSegmentTM1637.h"
 #include "SevenSegmentExtended.h"
 
-const byte PIN_CLK = 8;   // define CLK pin (any digital pin)
-const byte PIN_DIO = 9;   // define DIO pin (any digital pin)
+#include <Encoder.h>
+Encoder myEnc(6, 7);
+long oldPosition  = -999;
+
+const byte PIN_CLK = 2;   // define CLK pin (any digital pin)
+const byte PIN_DIO = 3;   // define DIO pin (any digital pin)
 SevenSegmentExtended    display(PIN_CLK, PIN_DIO);
 
 #define FuseTIME      1500  //Fuse current duration in milliseconds.
 
-#define Fuss     7          //Pin connected to the Fuse relay.
-#define GoButt   6          //Pin connected to the GO button.
-#define ArmButt  5          //Pin connected to the ARM button.
-#define BuzzPin  4          //Connected to the Speaker.
-#define SetPot   0          //Analog Pin connected to the Pot.
-
+#define TimeButt    4          //Pin connected to the ARM button.
+#define LaunchButt  5          //Pin connected to the GO button.
+#define LaunchRelay 8          //Pin connected to the Fuse relay.
+#define Buzzer      9          //Pin Connected to the Speaker.
+#define armState    10         //Pin Arming is present
 
 void setup(){
-  pinMode(Fuss,OUTPUT);
-  pinMode(ArmButt, INPUT);        // set "ARM" button pin to input
-  pinMode(GoButt, INPUT);         // set "GO" button pin to input
-  digitalWrite(Fuss,LOW);         //OPEN the fuse circuit.
-  digitalWrite(ArmButt, HIGH);    // turn on pullup resistor 
-  digitalWrite(GoButt, HIGH);     // turn on pullup resistor 
+  pinMode(LaunchRelay,OUTPUT);
+  pinMode(TimeButt, INPUT);        // set "ARM" button pin to input
+  pinMode(LaunchButt, INPUT);         // set "GO" button pin to input
+  digitalWrite(LaunchRelay,LOW);         //OPEN the fuse circuit.
+  digitalWrite(TimeButt, HIGH);    // turn on pullup resistor 
+  digitalWrite(LaunchButt, HIGH);     // turn on pullup resistor 
 
   display.begin();            // initializes the display
   display.setBacklight(100);  // set the brightness to 100 %
@@ -39,7 +42,9 @@ void setup(){
   display.clear();                      // clear the display
   
   delay(10);                      //Wait for Serial Display startup.
-
+  
+  Serial.begin(9600);
+  Serial.println("Basic Encoder Test:");
 }
 
 int  DownCntr;                    // down counter (1/10 Secs.)
@@ -47,65 +52,66 @@ int  Go=0;                        // Stopped
 
 //================================================================
 void loop(){
-  if(!digitalRead(GoButt)||!digitalRead(ArmButt)){
+  if(!digitalRead(LaunchButt)||!digitalRead(TimeButt)){
     Go=0;                         //ABORT!!!
-    tone(BuzzPin, 440, 1500);
+    tone(Buzzer, 440, 1500);
     delay(1500);
   }
 
   if(Go==0){
-    WaitARM();  
-    WaitGO();
+    WaitTime();  
+    WaitLaunch();
   }
   
   ShowTimer();
   
   if (DownCntr > 50){
-      if (DownCntr % 10 ==0)tone(BuzzPin, 1000, 50);  //Tone every second.
+      if (DownCntr % 10 ==0)tone(Buzzer, 1000, 50);  //Tone every second.
      }
-  else if (DownCntr % 2 ==0)tone(BuzzPin, 1000, 50);  //Tone every 1/5 second.
+  else if (DownCntr % 2 ==0)tone(Buzzer, 1000, 50);  //Tone every 1/5 second.
 
   if (DownCntr ==0){
     //------------------ ROCKET LAUNCH! --------------------
-    tone(BuzzPin, 440, FuseTIME);  //Launch audible signal
-    digitalWrite(Fuss,HIGH);       //CLOSE the fuse circuit
+    tone(Buzzer, 440, FuseTIME);  //Launch audible signal
+    digitalWrite(LaunchRelay,HIGH);       //CLOSE the fuse circuit
     delay(FuseTIME);
-    digitalWrite(Fuss,LOW);        //OPEN the fuse circuit.
+    digitalWrite(LaunchRelay,LOW);        //OPEN the fuse circuit.
     //------------------------------------------------------
      Go=0;
     }
   while (millis()% 100);        //Wait until the next 1/10 of second.
   delay(50);
-  DownCntr--;
+  DownCntr--;  
 }
 
 //----------------------------------------
-void WaitGO(){
+void WaitLaunch(){
   ShowTimer();
-  while(digitalRead(GoButt));
+  while(digitalRead(LaunchButt)==1);
   Go=1;
   delay(20);
-  while(!digitalRead(GoButt));  //Debounce GO button.
+  while(!digitalRead(LaunchButt));  //Debounce GO button.
 }
 
 //------------------------------------------------------
 void ReadTimer(){
-//  DownCntr = map(analogRead(SetPot), 0, 1023, 5, 60);
-//  DownCntr*=10; 
- 
   DownCntr = (10);
 }
 //------------------------------------------------------
 void ShowTimer(){
-  String seconds = String (DownCntr, DEC);
-  while(seconds.length()<4)seconds= "00" + seconds;     //format to 4 numbers.
-  display.printTime(0, 0, true);                         //Write to Display.
+  display.printTime(0, DownCntr, true);                         //Write to Display.
 }
 
 //------------------------------------------------------
-void WaitARM(){
-  while(digitalRead(ArmButt)==1){
-     ReadTimer(); 
+void WaitTime(){
+
+//  long newPosition = myEnc.read();
+//  if (newPosition != oldPosition) {
+//    oldPosition = newPosition;
+//    Serial.println(newPosition);
+//  }
+  
+  while(digitalRead(TimeButt)==1){
      display.clear();    //Turn Off Digits.
      delay(50);
      ReadTimer(); 
@@ -115,13 +121,13 @@ void WaitARM(){
 
   Go=0;
   ShowTimer();
-  tone(BuzzPin, 2000, 150);
+  tone(Buzzer, 2000, 150);
   delay(200);
-  tone(BuzzPin, 2000, 150);
+  tone(Buzzer, 2000, 150);
   delay(200);
-  tone(BuzzPin, 2000, 150);
+  tone(Buzzer, 2000, 150);
 
   delay(20);
-  while(!digitalRead(ArmButt));  //Debounce ARM button.
+  while(!digitalRead(TimeButt));  //Debounce ARM button.
 
 }
