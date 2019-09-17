@@ -14,7 +14,7 @@ Arduining.com  05 Jan 2012 (hardware implemented version)
 
 const byte PIN_CLK = 8;   // define CLK pin (any digital pin)
 const byte PIN_DIO = 9;   // define DIO pin (any digital pin)
-SevenSegmentTM1637    display(PIN_CLK, PIN_DIO);
+SevenSegmentExtended    display(PIN_CLK, PIN_DIO);
 
 #define FuseTIME      1500  //Fuse current duration in milliseconds.
 
@@ -99,7 +99,7 @@ void ReadTimer(){
 void ShowTimer(){
   String seconds = String (DownCntr, DEC);
   while(seconds.length()<4)seconds= "00" + seconds;     //format to 4 numbers.
-  display.print(seconds);                         //Write to Display.
+  display.printTime(0, 0, true);                         //Write to Display.
 }
 
 //------------------------------------------------------
