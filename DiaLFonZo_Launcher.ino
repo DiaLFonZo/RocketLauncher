@@ -1,133 +1,172 @@
-/*RocketLauncher
-ROCKET LAUNCHER CONTROLLER.
-Arduining.com  05 Jan 2012 (hardware implemented version)
-
--A count-down TIMER is implemented.
--The potentiometer is used to set the TIMER.
--Two Push-Buttons: "ARM" to set the counter and "GO" to start the counter.
--Display: Sparkfun's Serial 4 Digit 7-Segment Display . COM-09766 (RED).
--NewSoftSerial library is used to avoid random commands to the display
- during program downloading.
-*/
+// Display
 #include "SevenSegmentTM1637.h"
 #include "SevenSegmentExtended.h"
-
-#include <Encoder.h>
-Encoder myEnc(6, 7);
-long oldPosition  = -999;
-
 const byte PIN_CLK = 2;   // define CLK pin (any digital pin)
 const byte PIN_DIO = 3;   // define DIO pin (any digital pin)
 SevenSegmentExtended    display(PIN_CLK, PIN_DIO);
 
-#define FuseTIME      1500  //Fuse current duration in milliseconds.
+// Encoder
+#include <Encoder.h>
+Encoder myEnc(6, 7);
+long oldPosition  = -999;
+long newPosition;
 
+// Timers
+int sequenceTime;
+
+unsigned long prevTimeMillis = 0;
+unsigned long currentTimeMillis = 0;
+unsigned long prevBuzzMillis = 0;
+unsigned long currentBuzzMillis = 0;
+unsigned long prevLaunchMillis = 0;
+unsigned long currentLaunchMillis = 0;
+
+// Pins
 #define TimeButt    4          //Pin connected to the ARM button.
 #define LaunchButt  5          //Pin connected to the GO button.
 #define LaunchRelay 8          //Pin connected to the Fuse relay.
 #define Buzzer      9          //Pin Connected to the Speaker.
-#define armState    10         //Pin Arming is present
+#define ArmButt    10         //Pin Arming is present
 
 void setup(){
   pinMode(LaunchRelay,OUTPUT);
   pinMode(TimeButt, INPUT);        // set "ARM" button pin to input
   pinMode(LaunchButt, INPUT);         // set "GO" button pin to input
+  pinMode(ArmButt, INPUT);         // set "GO" button pin to input
   digitalWrite(LaunchRelay,LOW);         //OPEN the fuse circuit.
   digitalWrite(TimeButt, HIGH);    // turn on pullup resistor 
   digitalWrite(LaunchButt, HIGH);     // turn on pullup resistor 
 
+  delay(1000);
   display.begin();            // initializes the display
-  display.setBacklight(100);  // set the brightness to 100 %
-  delay(1000);                // wait 1000 ms
+  display.setBacklight(100);  // set the brightness to 100 %              
   display.clear();                      // clear the display
-  
-  delay(10);                      //Wait for Serial Display startup.
-  
+  display.print("INIT");
+  delay(1000);
   Serial.begin(9600);
-  Serial.println("Basic Encoder Test:");
 }
 
-int  DownCntr;                    // down counter (1/10 Secs.)
-int  Go=0;                        // Stopped
+int   menuLocation = 1;           // Sequence location
+const long sysInterval = 1000;    // Base interval for the slowest buzzer
 
-//================================================================
-void loop(){
-  if(!digitalRead(LaunchButt)||!digitalRead(TimeButt)){
-    Go=0;                         //ABORT!!!
-    tone(Buzzer, 440, 1500);
-    delay(1500);
+void loop() {
+  switch (menuLocation) {
+    case 1:
+        while(digitalRead(TimeButt)==1){
+          updateEncoder();
+          updateTime();
+          }
+        menuLocation = 2;
+        while(!digitalRead(TimeButt));
+      break;
+    case 2:
+        updateTime();
+        if(digitalRead(ArmButt)==1){
+            updateBuzz();
+            if(digitalRead(LaunchButt)==1) {
+                countDown();
+                menuLocation = 3;
+            break;
+            }
+        }
+        if(digitalRead(LaunchButt)==1) {
+            tone(Buzzer, 300, 1000);
+            delay(500);
+          break;
+        }
+        if(digitalRead(TimeButt)==0) {
+            tone(Buzzer, 300, 1000);
+            delay(500);
+            menuLocation = 1;
+          break;
+        }
+      break;
+    case 3:
+          launch();
+          menuLocation = 1;
+        break;
+      default:
+        menuLocation = 1;
+        break;
   }
+}
 
-  if(Go==0){
-    WaitTime();  
-    WaitLaunch();
+void updateTime() {
+  currentTimeMillis = millis();
+  
+  int num0 = (sequenceTime / 10) % 10;
+  int num1 = (sequenceTime / 1) % 10;
+
+  if (currentTimeMillis - prevTimeMillis >= sysInterval / 20) {
+    display.setColonOn(true);
+    display.setCursor(0, 0);
+    display.print(num0);
+    display.setCursor(0, 1);
+    display.print(num1);
+    display.setCursor(0, 2);
+    display.print(0);
+    display.setCursor(0, 3);
+    display.print(0);
   }
-  
-  ShowTimer();
-  
-  if (DownCntr > 50){
-      if (DownCntr % 10 ==0)tone(Buzzer, 1000, 50);  //Tone every second.
-     }
-  else if (DownCntr % 2 ==0)tone(Buzzer, 1000, 50);  //Tone every 1/5 second.
+  if (menuLocation == 1){
+    if (currentTimeMillis - prevTimeMillis >= (sysInterval / 6)) {
+      prevTimeMillis = currentTimeMillis;
+      display.clear();
+    } 
+  }
+}
 
-  if (DownCntr ==0){
-    //------------------ ROCKET LAUNCH! --------------------
-    tone(Buzzer, 440, FuseTIME);  //Launch audible signal
-    digitalWrite(LaunchRelay,HIGH);       //CLOSE the fuse circuit
-    delay(FuseTIME);
-    digitalWrite(LaunchRelay,LOW);        //OPEN the fuse circuit.
-    //------------------------------------------------------
-     Go=0;
+void countDown() {
+  while(sequenceTime > 0){
+    tone(Buzzer, 1500, 50);
+    updateTime();
+    sequenceTime--;
+    delay(1000);
+  } 
+  updateTime();
+}
+void launch() {
+  digitalWrite(LaunchRelay, 1);
+  tone(Buzzer, 1500, 4000);
+  display.blink();
+  delay(250);
+  display.blink();
+  delay(250);
+  display.blink();
+  delay(250);
+  display.blink();
+  digitalWrite(LaunchRelay, 0);
+  myEnc.write(0);
+  delay(500);
+  display.clear(); 
+  display.print("DONE");
+  delay(5000);  
+}
+
+void updateEncoder() {
+  newPosition = (myEnc.read() / 4);
+  if (newPosition < 0){
+    myEnc.write(0);
+  }
+  else if (newPosition > 60) {
+    myEnc.write(60 * 4);
+  }
+  else {
+    if (newPosition != oldPosition) {
+      oldPosition = newPosition;
+      sequenceTime = newPosition;
+      tone(Buzzer, 1500, 15);
     }
-  while (millis()% 100);        //Wait until the next 1/10 of second.
-  delay(50);
-  DownCntr--;  
-}
-
-//----------------------------------------
-void WaitLaunch(){
-  ShowTimer();
-  while(digitalRead(LaunchButt)==1);
-  Go=1;
-  delay(20);
-  while(!digitalRead(LaunchButt));  //Debounce GO button.
-}
-
-//------------------------------------------------------
-void ReadTimer(){
-  DownCntr = (10);
-}
-//------------------------------------------------------
-void ShowTimer(){
-  display.printTime(0, DownCntr, true);                         //Write to Display.
-}
-
-//------------------------------------------------------
-void WaitTime(){
-
-//  long newPosition = myEnc.read();
-//  if (newPosition != oldPosition) {
-//    oldPosition = newPosition;
-//    Serial.println(newPosition);
-//  }
-  
-  while(digitalRead(TimeButt)==1){
-     display.clear();    //Turn Off Digits.
-     delay(50);
-     ReadTimer(); 
-     ShowTimer();                   //Show Digits.
-     delay(150);
   }
+}
 
-  Go=0;
-  ShowTimer();
-  tone(Buzzer, 2000, 150);
-  delay(200);
-  tone(Buzzer, 2000, 150);
-  delay(200);
-  tone(Buzzer, 2000, 150);
-
-  delay(20);
-  while(!digitalRead(TimeButt));  //Debounce ARM button.
-
+void updateBuzz() {
+  currentBuzzMillis = millis();
+  if (currentBuzzMillis - prevBuzzMillis >= (sysInterval / 4)) {
+    tone(Buzzer, 1000, 500);
+  }
+  if (currentBuzzMillis - prevBuzzMillis >= (sysInterval / 2)) {
+    prevBuzzMillis = currentBuzzMillis;
+    tone(Buzzer, 1100, 500);
+  }
 }
