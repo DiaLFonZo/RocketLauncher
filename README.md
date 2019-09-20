@@ -15,3 +15,6 @@ Since i choose some other components i had to change to code quite a bit so i st
 - [Illuminated Toggle Switch On / Off (Red)](https://www.robotshop.com/ca/en/illuminated-toggle-switch-red.html "Illuminated Toggle Switch On / Off (Red)")
 - [Gravity Single Relay Module](https://www.robotshop.com/ca/en/gravity-single-relay-module.html "Gravity Single Relay Module")
 - [Enclosure - Flanged (Red)](https://www.robotshop.com/ca/en/enclosure-flanged-red.html "Enclosure - Flanged (Red)")
+
+YouTube List - DiaLFonZo Rocket Launcher 
+https://www.youtube.com/playlist?list=PLUswUJzeLw3YFtjNtgKVTf-hGD64TIVGS
